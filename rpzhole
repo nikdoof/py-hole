@@ -152,7 +152,7 @@ def main():
     # reload RPZ
     if args.reloadzone:
         _logger.info('Informing Bind to reload the zone')
-        res = subprocess.call('rndc reload %' % config['origin'], shell=True)
+        res = subprocess.call('rndc reload %s' % config['origin'], shell=True)
 
 if __name__ == '__main__':
     main()
