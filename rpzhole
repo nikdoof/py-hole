@@ -62,9 +62,9 @@ def parse_blacklist(format, filename=None, fobj=None):
         data = []
         if format == 'hosts':
             for line in fobj:
-                if line == '' or line[0] == '#': continue
-                items = re.split ( r'\s+', line )
-                data.extend(items[1:])
+                if line.strip() == '' or line[0] == '#': continue
+                hosts = [x for x in re.split ( r'\s+', line) if x != ''][1:]
+                data.extend(hosts)
         elif format == 'raw':
             for line in fobj:
                 if line == '' or line[0] == '#': continue
@@ -81,6 +81,7 @@ def write_rpz(hosts, filename, origin='rpz.black.hole'):
         for host in hosts:
             if host and not '_' in host:
                 fobj.write("%s\t\tA\t127.0.0.1\n" % host)
+                fobj.write("%s\t\tAAAA\t::1\n" % host)
 
 def main():
 
@@ -142,8 +143,12 @@ def main():
             _logger.error('Unable to download or parse %s blacklist: %s', name, e)
 
     # Remove duplicates and exclude any hosts on the exclusion list
-    output_hostlist = set(blacklist_hosts) - set(config['exclusions'])
-    _logger.info('%d unique hosts used to create RPZ, %d entries from blacklists, %d exclusion hosts', len(output_hostlist), len(blacklist_hosts), len(config['exclusions']))
+
+    unique_hosts = set(blacklist_hosts)
+    long_hosts = set([x for x in unique_hosts if len(x) > 255])
+    excluded_hosts = set(config['exclusions'])
+    output_hostlist = unique_hosts - (long_hosts & excluded_hosts)
+    _logger.info('%d unique hosts used to create RPZ, %d entries from blacklists, %d manually excluded hosts, %d excluded due to long names', len(output_hostlist), len(blacklist_hosts), len(config['exclusions']), len(long_hosts))
 
     # write RPZ
     write_rpz(output_hostlist, config['output_filename'], config['origin'])
