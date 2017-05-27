@@ -63,7 +63,7 @@ def parse_blacklist(format, filename=None, fobj=None):
         if format == 'hosts':
             for line in fobj:
                 if line.strip() == '' or line[0] == '#': continue
-                hosts = [x for x in re.split ( r'\s+', line) if x != ''][1:]
+                hosts = [x for x in re.split ( r'\s+', line) if x != '' and x[0] != '#'][1:]
                 data.extend(hosts)
         elif format == 'raw':
             for line in fobj:
