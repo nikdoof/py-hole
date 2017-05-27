@@ -1,0 +1,136 @@
+#!/usr/bin/env python
+
+import logging
+import yaml
+import time
+import re
+import os
+import sys
+import requests
+import argparse
+import subprocess
+
+__version__ = '0.1'
+
+_logger = logging.getLogger("rpzhole")
+
+def download_blacklist(url, cache_file):
+    """Downloads and stores a blacklist, returns a filepath"""
+
+    # If we have an existing file, do a header call, check the size and if its the same don't re-download
+    if os.path.exists(cache_file):
+        resp = requests.head(url)
+        if resp.ok and 'content-length' in resp.headers and os.path.getsize(cache_file) == int(resp.headers['content-length']):
+            return True
+
+    # If we don't have the file or missed the cache, download the file
+    resp = requests.get(url, headers={'User-Agent': 'rpzhole %s' % __version__})
+    if resp.ok:
+        with file(cache_file, 'wb') as fobj:
+            for block in resp.iter_content(1024):
+                if block: fobj.write(block)
+        return True
+
+def parse_blacklist(format, filename=None, fobj=None):
+    if not format in ('hosts', 'raw'):
+        raise Exception('Unsupported format %s' % format)
+    if not fobj:
+        with open(filename, 'rb') as fobj:
+            return parse_blacklist(format, fobj=fobj)
+    else:
+        data = []
+        if format == 'hosts':
+            for line in fobj:
+                if line == '' or line[0] == '#': continue
+                items = re.split ( r'\s+', line )
+                data.extend(items[1:])
+        elif format == 'raw':
+            for line in fobj:
+                if line == '' or line[0] == '#': continue
+                data.append(line.strip())
+        return data
+
+def write_rpz(hosts, filename, origin='rpz.black.hole'):
+    rpz_header = ["$TTL 60", "$ORIGIN %s" % origin, "@ SOA nonexistent.nodomain.none. dummy.nodomain.none. %d 12h 15m 3w 2h" % time.time(), "NS nonexistant.nodomain.none"]
+    with open(filename, 'wb') as fobj:
+        for line in rpz_header:
+            fobj.write('%s\n' % line)
+        fobj.write('\n')
+        for host in hosts:
+            if host:
+                fobj.write("%s\t\tA\t127.0.0.1\n" % host)
+
+def main():
+
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='Generate Bind9 RPZ zone files from Blacklists')
+    parser.add_argument('--config', dest='config_file')
+    parser.add_argument('--debug', help='Enables logging of debug messages', default=False, action='store_true')
+    parser.add_argument('--silent', help='Disables all logging except for errors, useful for cron execution', default=False, action='store_true')
+    parser.add_argument('--reloadzone', help='Ask Bind to reload the RPZ zone file once completed', default=False, action='store_true')
+    args = parser.parse_args()
+
+    # Enable verbosity
+    if args.silent:
+        level = logging.ERROR
+    elif args.debug:
+        level = logging.DEBUG
+    else:
+        level = logging.INFO
+    logging.basicConfig(level=level)
+    logging.getLogger("requests").setLevel(logging.WARNING)
+    _logger.debug('Parsed Args: %s', str(args))
+
+    # Load configuration
+    if not args.config_file:
+        default_paths = [os.path.join(os.getcwd(), 'rpzhole.yaml'), os.path.expanduser('~/.rpzhole.yaml'), '/etc/bind/rpzhole.yaml', '/etc/rpzhole.yaml']
+        for filepath in default_paths:
+            if os.path.exists(filepath):
+                _logger.debug('Found configuration file %s', filepath)
+                args.config_file = filepath
+                break
+        else:
+            _logger.error("Unable to find usable configuration file in any of the following locations: %s", ', '.join(default_paths))
+            sys.exit(1)
+    config_file_path = os.path.abspath(os.path.expanduser(args.config_file))
+    _logger.debug('Loading configuration file %s', config_file_path)
+    with open(config_file_path, 'rb') as fobj:
+        config = yaml.load(fobj)
+    
+    # Pre-create the cache locations
+    if not os.path.exists(config['cache_dir']):
+        try:
+            os.makedirs(config['cache_dir'])
+        except OSError as e:
+            _logger.error('Unable to create caching directory: %s, exiting...', e)
+            sys.exit(1)
+
+    # Download blacklists
+    blacklist_hosts = []
+    for name, val in config['blacklists'].items():
+        _logger.info('Processing %s blacklist', name)
+        cache_file = os.path.join(config['cache_dir'], config['cache_prefix'] + name + '.list')
+        try:
+            if download_blacklist(val['url'], cache_file):
+                _logger.debug('Parsing %s as format %s', name, val['format'])
+                list_hosts = parse_blacklist(val['format'], cache_file)
+                _logger.info('Adding %d hosts from %s blacklist', len(list_hosts), name)
+                blacklist_hosts.extend(list_hosts)
+        except Exception as e:
+            _logger.error('Unable to download or parse %s blacklist: %s', name, e)
+
+    # Remove duplicates and exclude any hosts on the exclusion list
+    output_hostlist = set(blacklist_hosts) - set(config['exclusions'])
+    _logger.info('%d unique hosts used to create RPZ, %d entries from blacklists, %d exclusion hosts', len(output_hostlist), len(blacklist_hosts), len(config['exclusions']))
+
+    # write RPZ
+    write_rpz(output_hostlist, config['output_filename'], config['origin'])
+    _logger.info('RPZ zone wrote to %s', config['output_filename'])
+
+    # reload RPZ
+    if args.reloadzone:
+        _logger.info('Informing Bind to reload the zone')
+        res = subprocess.call('rndc reload %s' % config['origin'])
+
+if __name__ == '__main__':
+    main()

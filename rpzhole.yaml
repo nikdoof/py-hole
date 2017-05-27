@@ -1,0 +1,34 @@
+---
+
+blacklists:
+  StevenBlack:
+    url: https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts
+    format: hosts
+  malwaredomains: 
+    url: 'https://mirror1.malwaredomains.com/files/justdomains'
+    format: raw 
+  cameleon: 
+    url: http://sysctl.org/cameleon/hosts
+    format: hosts
+  abuse.ch: 
+    url: https://zeustracker.abuse.ch/blocklist.php?download=domainblocklist
+    format: raw
+  disconnect.me_tracking:
+    url: https://s3.amazonaws.com/lists.disconnect.me/simple_tracking.txt
+    format: raw
+  disconnect.me_ad: 
+    url: https://s3.amazonaws.com/lists.disconnect.me/simple_ad.txt 
+    format: raw
+  securemecca.com:
+    url: http://securemecca.com/Downloads/hosts.txt
+    format: hosts
+  
+exclusions:
+  - www.googleadservices.com
+  - pagead.l.doubleclick.net
+
+origin: rpz.home.tensixtyone.com
+output_filename: ./rpz.zone
+cache_dir: ./cache/
+cache_prefix: rpzhole-
+
