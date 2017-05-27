@@ -73,13 +73,13 @@ def parse_blacklist(format, filename=None, fobj=None):
 
 def write_rpz(hosts, filename, origin='rpz.black.hole'):
     """Produces a basic Bind RPZ zone file from a list of hosts"""
-    rpz_header = ["$TTL 60", "$ORIGIN %s" % origin, "@ SOA nonexistent.nodomain.none. dummy.nodomain.none. %d 12h 15m 3w 2h" % time.time(), "@ NS nonexistant.nodomain.none"]
+    rpz_header = ["$TTL 60", "@ IN SOA %s. root.%s. (%d 12h 15m 3w 2h)" % (origin, origin, time.time()), "@ IN NS nonexistant.nodomain.none", "$ORIGIN %s" % origin]
     with open(filename, 'wb') as fobj:
         for line in rpz_header:
             fobj.write('%s\n' % line)
         fobj.write('\n')
         for host in hosts:
-            if host:
+            if host and not '_' in host:
                 fobj.write("%s\t\tA\t127.0.0.1\n" % host)
 
 def main():
