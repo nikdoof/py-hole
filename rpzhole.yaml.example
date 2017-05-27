@@ -27,7 +27,7 @@ exclusions:
   - www.googleadservices.com
   - pagead.l.doubleclick.net
 
-origin: rpz.home.tensixtyone.com
+origin: rpz
 output_filename: ./rpz.zone
 cache_dir: ./cache/
 cache_prefix: rpzhole-
