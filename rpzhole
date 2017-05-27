@@ -28,13 +28,15 @@ import requests
 import argparse
 import subprocess
 
+__author__ = 'Andrew Williams, Glen Pitt-Pladdy'
+__copyright__ = 'Copyright 2017, Andrew Williams and Glen Pitt-Pladdy'
+__license__ = 'GPL'
 __version__ = '0.1'
 
 _logger = logging.getLogger("rpzhole")
 
 def download_blacklist(url, cache_file):
     """Downloads and stores a blacklist, returns a filepath"""
-
     # If we have an existing file, do a header call, check the size and if its the same don't re-download
     if os.path.exists(cache_file):
         resp = requests.head(url)
@@ -50,6 +52,7 @@ def download_blacklist(url, cache_file):
         return True
 
 def parse_blacklist(format, filename=None, fobj=None):
+    """Parses a blacklist file and returns a list of hosts"""
     if not format in ('hosts', 'raw'):
         raise Exception('Unsupported format %s' % format)
     if not fobj:
@@ -69,6 +72,7 @@ def parse_blacklist(format, filename=None, fobj=None):
         return data
 
 def write_rpz(hosts, filename, origin='rpz.black.hole'):
+    """Produces a basic Bind RPZ zone file from a list of hosts"""
     rpz_header = ["$TTL 60", "$ORIGIN %s" % origin, "@ SOA nonexistent.nodomain.none. dummy.nodomain.none. %d 12h 15m 3w 2h" % time.time(), "NS nonexistant.nodomain.none"]
     with open(filename, 'wb') as fobj:
         for line in rpz_header:
