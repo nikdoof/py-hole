@@ -31,4 +31,5 @@ origin: rpz
 output_filename: ./rpz.zone
 cache_dir: ./cache/
 cache_prefix: rpzhole-
+ipv6: True
 
